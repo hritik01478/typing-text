@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './home.scss';
+import { ArrowBackOutlined } from '@mui/icons-material'
 import randomWords from 'random-words';
-import { useEffect } from 'react';
+// import { } from 'react';
 
 
 const Home = () => {
@@ -11,32 +12,74 @@ const Home = () => {
     const [words, setWords] = useState([]);
     const [countDown, setCountDown] = useState(SECONDS);
     const [currInput, setCurrInput] = useState("");
+    const [play, setPlay] = useState("START");
     const [currWordIndex, setCurrWordIndex] = useState(0);
+    const [currCharIndex, setCurrCharIndex] = useState(-1);
+    const [currChar, setCurrChar] = useState("");
     const [correct, setCorrect] = useState(0);
     const [incorrect, setIncorrect] = useState(0);
+    const [status, setStatus] = useState("waiting");
+    const textInput = useRef(null);
 
     useEffect(() => {
-        setWords(randomWords(NUMBER_OF_WORDS))
+        setWords(generateWords())
+        // setWords(randomWords(NUMBER_OF_WORDS));
     }, []);
+    useEffect(() => {
+        if (status === "started") {
+            textInput.current.focus();
+        }
+    }, [status]);
 
-    const handleTimer = () => {
-        let interval = setInterval(() => {
-            setCountDown((prevCountDown) => {
-                if (prevCountDown === 0) {
-                    clearInterval(interval);
-                }
-                else {
-                    return prevCountDown - 1;
-                }
-            });
-        }, 1000)
+    const generateWords = () => {
+        return randomWords(NUMBER_OF_WORDS);
     }
 
-    const handleKeyDown = ({ keyCode }) => {
+    const handleTimer = () => {
+        if (status === "finished") {
+            setWords(generateWords());
+            setCorrect(0);
+            setIncorrect(0);
+            setCurrWordIndex(0);
+            setPlay("START");
+            setStatus("waiting");
+            setCurrChar("");
+            setCurrCharIndex(-1);
+        }
+
+        if (status === "waiting") {
+            setStatus("started");
+            let interval = setInterval(() => {
+                setCountDown((prevCountDown) => {
+                    if (prevCountDown === 0) {
+                        setPlay("TRY AGAIN")
+                        clearInterval(interval);
+                        setStatus("finished");
+                        setCurrInput("");
+                        return SECONDS;
+                    }
+                    else {
+                        return prevCountDown - 1;
+                    }
+                });
+            }, 1000)
+        }
+    }
+
+    const handleKeyDown = ({ keyCode, key }) => {
+        console.log(keyCode);
         if (keyCode === 32) {
             checkMatch();
             setCurrInput("")
-            setCurrWordIndex(currWordIndex + 1)
+            setCurrWordIndex(currWordIndex + 1);
+            setCurrCharIndex(-1);
+        } else if (keyCode === 8) {
+            setCurrCharIndex(currCharIndex - 1);
+            setCurrChar("");
+        }
+        else {
+            setCurrCharIndex(currCharIndex + 1);
+            setCurrChar(key);
         }
     }
 
@@ -52,32 +95,52 @@ const Home = () => {
         }
     }
 
+    const getCharClass = (WordIdx, CharIdx, char) => {
+        if (WordIdx === currWordIndex && CharIdx === currCharIndex && currChar && status !== "finished") {
+            if (char === currChar) {
+                return "success";
+            }
+            else {
+                return "danger";
+            }
+        }
+        else if (WordIdx === currWordIndex && currCharIndex >= words[currWordIndex].length) {
+            return "danger"
+        }
+        else {
+            return ""
+        }
+    }
+
     return (
         <div className="typing">
+            <div className="back">
+                <ArrowBackOutlined />
+                back</div>
             <div className="typing-wrapper">
                 <div className="typing-timer">{countDown}</div>
-                <div className="typing-card">
+                {status === "started" && <div className="typing-card">
                     <div className="typing-content">
                         {words.map((word, i) => (
                             <span key={i}>
                                 <span>
                                     {word.split("").map((char, idx) => (
-                                        < span key={idx}>{char}</span>
+                                        < span className={getCharClass(i, idx, char)} key={idx}>{char}</span>
                                     ))}
                                 </span>
                                 <span> </span>
                             </span>
                         ))}
                     </div>
-                </div>
+                </div>}
                 <div className="input-card">
-                    <input type="text" className='input-content' placeholder='Type here...' onKeyDown={handleKeyDown} value={currInput} onChange={(e) => setCurrInput(e.target.value)} />
+                    <input ref={textInput} disabled={status !== "started"} type="text" className='input-content' placeholder='Type here...' onKeyDown={handleKeyDown} value={currInput} onChange={(e) => setCurrInput(e.target.value)} />
                 </div>
                 <button className="typing-btn" onClick={handleTimer}>
-                    START
+                    {play}
                 </button>
             </div >
-            <div className="result-wrapper">
+            {status === "finished" && <div className="result-wrapper">
                 <div className="columns">
                     <div className="wpm">
                         <p>Words per minute : </p>
@@ -90,7 +153,7 @@ const Home = () => {
                         <p className='result'>{Math.round((correct) / (correct + incorrect) * 100)} %</p>
                     </div>
                 </div>
-            </div>
+            </div>}
         </div >
     )
 }
